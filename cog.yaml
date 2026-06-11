@@ -15,6 +15,6 @@ build:
     - pillow==10.4.0
   run:
     # bake the weights into the image so cold starts don't re-download 885MB
-    - pip install "huggingface_hub[cli]==0.24.6"
-    - hf download joelseytre/toonout birefnet_finetuned_toonout.pth --local-dir /weights
+    - mkdir -p /weights
+    - curl -fsSL https://huggingface.co/joelseytre/toonout/resolve/main/birefnet_finetuned_toonout.pth -o /weights/birefnet_finetuned_toonout.pth
 predict: "predict.py:Predictor"
