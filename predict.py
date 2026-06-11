@@ -7,11 +7,10 @@ translucency. Pixel accuracy 95.3% -> 99.5% on their anime test set.
 Input: any image. Output: RGBA cutout (default) or the raw alpha matte.
 """
 
-from pathlib import Path
+import pathlib
 
 import torch
-from cog import BasePredictor, Input
-from cog import Path as CogPath
+from cog import BasePredictor, Input, Path
 from PIL import Image
 from torchvision import transforms
 from transformers import AutoModelForImageSegmentation
@@ -33,7 +32,7 @@ class Predictor(BasePredictor):
 
     def predict(
         self,
-        image: CogPath = Input(description="Input image"),
+        image: Path = Input(description="Input image"),
         resolution: int = Input(
             description="Inference resolution (square). 1024 matches training.",
             default=1024, ge=256, le=2048,
@@ -42,7 +41,7 @@ class Predictor(BasePredictor):
             description="rgba = cutout with alpha; mask = grayscale matte",
             default="rgba", choices=["rgba", "mask"],
         ),
-    ) -> CogPath:
+    ) -> Path:
         src = Image.open(str(image)).convert("RGB")
         tf = transforms.Compose([
             transforms.Resize((resolution, resolution)),
@@ -57,11 +56,11 @@ class Predictor(BasePredictor):
             preds = self.model(batch)[-1].sigmoid().float().cpu()
         matte = transforms.ToPILImage()(preds[0].squeeze()).resize(src.size)
 
-        out = Path("/tmp/output.png")
+        out = pathlib.Path("/tmp/output.png")
         if output_format == "mask":
             matte.save(out)
         else:
             rgba = src.convert("RGBA")
             rgba.putalpha(matte)
             rgba.save(out)
-        return CogPath(out)
+        return Path(out)
