@@ -25,6 +25,9 @@ class Predictor(BasePredictor):
             "ZhengPeng7/BiRefNet", trust_remote_code=True
         )
         state = torch.load(WEIGHTS, map_location="cpu", weights_only=True)
+        # checkpoint was saved from a DDP + torch.compile wrapper
+        state = {k.removeprefix("module.").removeprefix("_orig_mod."): v
+                 for k, v in state.items()}
         self.model.load_state_dict(state)
         self.model.to(self.device).eval()
         if self.device == "cuda":
