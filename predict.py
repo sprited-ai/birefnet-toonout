@@ -11,7 +11,7 @@ import pathlib
 
 import torch
 from cog import BasePredictor, Input, Path
-from PIL import Image
+from PIL import Image, ImageFilter
 from torchvision import transforms
 from transformers import AutoModelForImageSegmentation
 
@@ -41,8 +41,24 @@ class Predictor(BasePredictor):
             default=1024, ge=256, le=2048,
         ),
         output_format: str = Input(
-            description="rgba = cutout with alpha; mask = grayscale matte",
-            default="rgba", choices=["rgba", "mask"],
+            description="rgba = cutout with alpha; mask = grayscale matte; color = composite on background_color",
+            default="rgba", choices=["rgba", "mask", "color"],
+        ),
+        mask_blur: int = Input(
+            description="Gaussian blur radius applied to the matte (softer edges)",
+            default=0, ge=0, le=64,
+        ),
+        mask_offset: int = Input(
+            description="Grow (+) or shrink (-) the matte by this many pixels",
+            default=0, ge=-64, le=64,
+        ),
+        invert: bool = Input(
+            description="Invert the matte (keep background instead of subject)",
+            default=False,
+        ),
+        background_color: str = Input(
+            description="Hex color for output_format=color, e.g. #222222",
+            default="#222222",
         ),
     ) -> Path:
         src = Image.open(str(image)).convert("RGB")
@@ -59,9 +75,24 @@ class Predictor(BasePredictor):
             preds = self.model(batch)[-1].sigmoid().float().cpu()
         matte = transforms.ToPILImage()(preds[0].squeeze()).resize(src.size)
 
+        if mask_offset > 0:
+            for _ in range(mask_offset):
+                matte = matte.filter(ImageFilter.MaxFilter(3))
+        elif mask_offset < 0:
+            for _ in range(-mask_offset):
+                matte = matte.filter(ImageFilter.MinFilter(3))
+        if mask_blur > 0:
+            matte = matte.filter(ImageFilter.GaussianBlur(mask_blur))
+        if invert:
+            matte = Image.eval(matte, lambda v: 255 - v)
+
         out = pathlib.Path("/tmp/output.png")
         if output_format == "mask":
             matte.save(out)
+        elif output_format == "color":
+            bg = Image.new("RGB", src.size, background_color)
+            bg.paste(src, (0, 0), matte)
+            bg.save(out)
         else:
             rgba = src.convert("RGBA")
             rgba.putalpha(matte)
