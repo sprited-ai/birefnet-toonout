@@ -21,7 +21,7 @@ Packaged by [Sprited](https://spritedx.com) for the
 ## Deploy
 
 ```
-cog login && cog push r8.im/sprited-ai/birefnet-toonout
+cog login && cog push r8.im/sprited/birefnet-toonout
 ```
 
 ## Citation
